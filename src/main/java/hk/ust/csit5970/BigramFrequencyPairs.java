@@ -55,15 +55,19 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 				throws IOException, InterruptedException {
 			String line = ((Text) value).toString();
 			String[] words = line.trim().split("\\s+");
-			
-			/*
-			 * TODO: Your implementation goes here.
-			 */
-			// 生成所有相邻双词
+
+			if (words.length < 2) return;
+
+			// Generate bigrams and emit counts
 			for (int i = 0; i < words.length - 1; i++) {
-				String w1 = words[i];
-				String w2 = words[i + 1];
-				BIGRAM.set(w1, w2);
+				if (words[i].length() == 0 || words[i+1].length() == 0) continue;
+				
+				// Emit (w1, w2) -> 1
+				BIGRAM.set(words[i], words[i+1]);
+				context.write(BIGRAM, ONE);
+				
+				// Emit (w1, *) -> 1 for marginal counts
+				BIGRAM.set(words[i], "");
 				context.write(BIGRAM, ONE);
 			}
 		}
@@ -83,46 +87,42 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 		// Reuse objects.
 		private final static FloatWritable VALUE = new FloatWritable();
 		private final Map<String, Integer> counts = new HashMap<>();
-		private String currentA = null;
-		private int sumA = 0;
+		private String currentWord = null;
+		private int marginalCount = 0;
 
 		@Override
 		public void reduce(PairOfStrings key, Iterable<IntWritable> values,
 				Context context) throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
-			String A = key.getLeftElement();
-			String B = key.getRightElement();
-
-			// 如果遇到新的前缀词 A，重置计数器
-			if (!A.equals(currentA)) {
-				currentA = A;
-				counts.clear();
-				sumA = 0;
-			}
-			// 计算当前双词的总出现次数
+			String w1 = key.getLeftElement();
+			String w2 = key.getRightElement();
+			
+			// Calculate sum for this key
 			int sum = 0;
-			for (IntWritable val : values) {
-				sum += val.get();
+			for (IntWritable value : values) {
+				sum += value.get();
 			}
 
-			counts.put(B, sum);
-			sumA += sum;
-		}
+			// If this is a marginal count (w2 is empty)
+			if (w2.length() == 0) {
+				marginalCount = sum;
+				currentWord = w1;
+				return;
+			}
 
-		@Override
-		protected void cleanup(Context context) throws IOException, InterruptedException {
-			if (currentA != null) {
-				// 输出每个 B 的相对频率
-				for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-					String B = entry.getKey();
-					float freq = (float) entry.getValue() / sumA;
-					context.write(new PairOfStrings(currentA, B), new FloatWritable(freq));
-				}
+			// If we've moved to a new w1, output all stored probabilities
+			if (!w1.equals(currentWord)) {
+				// Reset for new word
+				currentWord = w1;
+				marginalCount = 0;
+				return;
+			}
+
+			// Calculate and emit relative frequency
+			if (marginalCount > 0) {
+				VALUE.set((float)sum / marginalCount);
+				context.write(key, VALUE);
 			}
 		}
-
 	}
 
 	/*
@@ -136,12 +136,9 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 		@Override
 		public void reduce(PairOfStrings key, Iterable<IntWritable> values,
 				Context context) throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
 			int sum = 0;
-			for (IntWritable val : values) {
-				sum += val.get();
+			for (IntWritable value : values) {
+				sum += value.get();
 			}
 			SUM.set(sum);
 			context.write(key, SUM);

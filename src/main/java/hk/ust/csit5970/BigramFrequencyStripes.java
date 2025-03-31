@@ -51,9 +51,24 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 			String line = ((Text) value).toString();
 			String[] words = line.trim().split("\\s+");
 
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			if (words.length < 2) return;
+
+			// Process each word except the last one
+			for (int i = 0; i < words.length - 1; i++) {
+				if (words[i].length() == 0 || words[i+1].length() == 0) continue;
+
+				// Create or clear the stripe for current word
+				STRIPE.clear();
+				
+				// Add the following word to the stripe with count 1
+				STRIPE.increment(words[i+1]);
+				
+				// Set the current word as key
+				KEY.set(words[i]);
+				
+				// Emit the key-stripe pair
+				context.write(KEY, STRIPE);
+			}
 		}
 	}
 
@@ -72,9 +87,29 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 		public void reduce(Text key,
 				Iterable<HashMapStringIntWritable> stripes, Context context)
 				throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			// Clear the sum stripes for new key
+			SUM_STRIPES.clear();
+			
+			// Sum up all stripes
+			for (HashMapStringIntWritable stripe : stripes) {
+				SUM_STRIPES.plus(stripe);
+			}
+			
+			// Calculate total count for normalization
+			int totalCount = 0;
+			for (String w2 : SUM_STRIPES.keySet()) {
+				totalCount += SUM_STRIPES.get(w2);
+			}
+			
+			// Emit relative frequencies
+			if (totalCount > 0) {
+				String w1 = key.toString();
+				for (String w2 : SUM_STRIPES.keySet()) {
+					BIGRAM.set(w1, w2);
+					FREQ.set((float)SUM_STRIPES.get(w2) / totalCount);
+					context.write(BIGRAM, FREQ);
+				}
+			}
 		}
 	}
 
@@ -91,9 +126,16 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 		public void reduce(Text key,
 				Iterable<HashMapStringIntWritable> stripes, Context context)
 				throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			// Clear the sum stripes for new key
+			SUM_STRIPES.clear();
+			
+			// Sum up all stripes
+			for (HashMapStringIntWritable stripe : stripes) {
+				SUM_STRIPES.plus(stripe);
+			}
+			
+			// Emit the combined stripe
+			context.write(key, SUM_STRIPES);
 		}
 	}
 
