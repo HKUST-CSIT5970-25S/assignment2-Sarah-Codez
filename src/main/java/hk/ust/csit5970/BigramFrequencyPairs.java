@@ -2,6 +2,8 @@ package hk.ust.csit5970;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -34,6 +36,10 @@ import org.apache.log4j.Logger;
 public class BigramFrequencyPairs extends Configured implements Tool {
 	private static final Logger LOG = Logger.getLogger(BigramFrequencyPairs.class);
 
+    /*
+     * Mapper 实现
+     * 输入：文本行，生成相邻双词作为键，值为 1
+     */
 	/*
 	 * TODO: write your Mapper here.
 	 */
@@ -53,9 +59,21 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			// 生成所有相邻双词
+			for (int i = 0; i < words.length - 1; i++) {
+				String w1 = words[i];
+				String w2 = words[i + 1];
+				BIGRAM.set(w1, w2);
+				context.write(BIGRAM, ONE);
+			}
 		}
 	}
 
+
+	/*
+	 * Reducer 实现
+	 * 计算每个双词的相对频率
+	 */
 	/*
 	 * TODO: Write your reducer here.
 	 */
@@ -64,6 +82,9 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 
 		// Reuse objects.
 		private final static FloatWritable VALUE = new FloatWritable();
+		private final Map<String, Integer> counts = new HashMap<>();
+		private String currentA = null;
+		private int sumA = 0;
 
 		@Override
 		public void reduce(PairOfStrings key, Iterable<IntWritable> values,
@@ -71,9 +92,43 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			String A = key.getLeftElement();
+			String B = key.getRightElement();
+
+			// 如果遇到新的前缀词 A，重置计数器
+			if (!A.equals(currentA)) {
+				currentA = A;
+				counts.clear();
+				sumA = 0;
+			}
+			// 计算当前双词的总出现次数
+			int sum = 0;
+			for (IntWritable val : values) {
+				sum += val.get();
+			}
+
+			counts.put(B, sum);
+			sumA += sum;
 		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			if (currentA != null) {
+				// 输出每个 B 的相对频率
+				for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+					String B = entry.getKey();
+					float freq = (float) entry.getValue() / sumA;
+					context.write(new PairOfStrings(currentA, B), new FloatWritable(freq));
+				}
+			}
+		}
+
 	}
-	
+
+	/*
+	 * Combiner 实现
+	 * 本地合并相同双词的计数
+	 */
 	private static class MyCombiner extends
 			Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
 		private static final IntWritable SUM = new IntWritable();
@@ -84,6 +139,12 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			int sum = 0;
+			for (IntWritable val : values) {
+				sum += val.get();
+			}
+			SUM.set(sum);
+			context.write(key, SUM);
 		}
 	}
 
