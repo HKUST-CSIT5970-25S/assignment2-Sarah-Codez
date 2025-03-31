@@ -57,7 +57,8 @@ public class CORPairs extends Configured implements Tool {
 			// Count word frequencies in this line
 			while (doc_tokenizer.hasMoreTokens()) {
 				String word = doc_tokenizer.nextToken();
-				word_set.put(word, word_set.getOrDefault(word, 0) + 1);
+				Integer count = word_set.get(word);
+				word_set.put(word, count == null ? 1 : count + 1);
 			}
 			
 			// Emit word frequencies
@@ -193,8 +194,10 @@ public class CORPairs extends Configured implements Tool {
 			// Get word frequencies
 			String w1 = key.getLeftElement();
 			String w2 = key.getRightElement();
-			int freq1 = word_total_map.getOrDefault(w1, 0);
-			int freq2 = word_total_map.getOrDefault(w2, 0);
+			Integer freq1 = word_total_map.get(w1);
+			if (freq1 == null) freq1 = 0;
+			Integer freq2 = word_total_map.get(w2);
+			if (freq2 == null) freq2 = 0;
 			
 			// Calculate co-occurrence frequency
 			int coFreq = 0;

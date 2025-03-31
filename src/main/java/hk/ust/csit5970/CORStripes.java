@@ -47,7 +47,8 @@ public class CORStripes extends Configured implements Tool {
 			// Count word frequencies in this line
 			while (doc_tokenizer.hasMoreTokens()) {
 				String word = doc_tokenizer.nextToken();
-				word_set.put(word, word_set.getOrDefault(word, 0) + 1);
+				Integer count = word_set.get(word);
+				word_set.put(word, count == null ? 1 : count + 1);
 			}
 			
 			// Emit word frequencies
@@ -126,7 +127,8 @@ public class CORStripes extends Configured implements Tool {
 			for (MapWritable value : values) {
 				for (Writable word : value.keySet()) {
 					IntWritable count = (IntWritable) value.get(word);
-					IntWritable sum = (IntWritable) stripe.getOrDefault(word, ZERO);
+					IntWritable sum = (IntWritable) stripe.get(word);
+					if (sum == null) sum = ZERO;
 					stripe.put(word, new IntWritable(sum.get() + count.get()));
 				}
 			}
@@ -183,14 +185,16 @@ public class CORStripes extends Configured implements Tool {
 		protected void reduce(Text key, Iterable<MapWritable> values, Context context) 
 				throws IOException, InterruptedException {
 			String word1 = key.toString();
-			int freq1 = word_total_map.getOrDefault(word1, 0);
+			Integer freq1 = word_total_map.get(word1);
+			if (freq1 == null) freq1 = 0;
 			
 			// Combine all stripes for this word
 			MapWritable sumStripe = new MapWritable();
 			for (MapWritable value : values) {
 				for (Writable word : value.keySet()) {
 					IntWritable count = (IntWritable) value.get(word);
-					IntWritable sum = (IntWritable) sumStripe.getOrDefault(word, ZERO);
+					IntWritable sum = (IntWritable) sumStripe.get(word);
+					if (sum == null) sum = ZERO;
 					sumStripe.put(word, new IntWritable(sum.get() + count.get()));
 				}
 			}
@@ -198,7 +202,8 @@ public class CORStripes extends Configured implements Tool {
 			// Calculate correlation coefficients
 			for (Writable w : sumStripe.keySet()) {
 				String word2 = ((Text)w).toString();
-				int freq2 = word_total_map.getOrDefault(word2, 0);
+				Integer freq2 = word_total_map.get(word2);
+				if (freq2 == null) freq2 = 0;
 				int coFreq = ((IntWritable)sumStripe.get(w)).get();
 				
 				if (freq1 > 0 && freq2 > 0) {
