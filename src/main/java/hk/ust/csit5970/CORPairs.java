@@ -101,8 +101,8 @@ public class CORPairs extends Configured implements Tool {
 		protected void map(LongWritable key, Text value, Context context) 
 				throws IOException, InterruptedException {
 			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
-			StringTokenizer doc_tokenizer = new StringTokenizer(
-				value.toString().replaceAll("[^a-z A-Z]", " "));
+			String clean_doc = value.toString().replaceAll("[^a-z A-Z]", " ");
+			StringTokenizer doc_tokenizer = new StringTokenizer(clean_doc);
 			
 			// Collect unique words in this line
 			Set<String> uniqueWords = new TreeSet<>();
@@ -150,10 +150,6 @@ public class CORPairs extends Configured implements Tool {
 		private final static Map<String, Integer> word_total_map = new HashMap<String, Integer>();
 		private final static DoubleWritable COR = new DoubleWritable();
 
-		/*
-		 * Preload the middle result file.
-		 * In the middle result file, each line contains a word and its frequency Freq(A), seperated by "\t"
-		 */
 		@Override
 		protected void setup(Context context) throws IOException, InterruptedException {
 			Path middle_result_path = new Path("mid/part-r-00000");
@@ -185,9 +181,6 @@ public class CORPairs extends Configured implements Tool {
 			}
 		}
 
-		/*
-		 * TODO: write your second-pass Reducer here.
-		 */
 		@Override
 		protected void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context) 
 				throws IOException, InterruptedException {

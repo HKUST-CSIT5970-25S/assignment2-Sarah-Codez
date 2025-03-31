@@ -88,18 +88,20 @@ public class CORStripes extends Configured implements Tool {
 		@Override
 		protected void map(LongWritable key, Text value, Context context) 
 				throws IOException, InterruptedException {
-			Set<String> sorted_word_set = new TreeSet<String>();
 			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
-			String doc_clean = value.toString().replaceAll("[^a-z A-Z]", " ");
-			StringTokenizer doc_tokenizers = new StringTokenizer(doc_clean);
-			while (doc_tokenizers.hasMoreTokens()) {
-				sorted_word_set.add(doc_tokenizers.nextToken());
+			String clean_doc = value.toString().replaceAll("[^a-z A-Z]", " ");
+			StringTokenizer doc_tokenizer = new StringTokenizer(clean_doc);
+			
+			// Collect unique words in this line
+			Set<String> uniqueWords = new TreeSet<>();
+			while (doc_tokenizer.hasMoreTokens()) {
+				uniqueWords.add(doc_tokenizer.nextToken());
 			}
 			
 			// For each word, create a stripe containing its co-occurring words
-			for (String word1 : sorted_word_set) {
+			for (String word1 : uniqueWords) {
 				MapWritable stripe = new MapWritable();
-				for (String word2 : sorted_word_set) {
+				for (String word2 : uniqueWords) {
 					if (word1.compareTo(word2) < 0) {  // ensure word1 < word2
 						stripe.put(new Text(word2), new IntWritable(1));
 					}
@@ -146,10 +148,6 @@ public class CORStripes extends Configured implements Tool {
 		private static final PairOfStrings PAIR = new PairOfStrings();
 		private static final DoubleWritable COR = new DoubleWritable();
 		
-		/*
-		 * Preload the middle result file.
-		 * In the middle result file, each line contains a word and its frequency Freq(A), seperated by "\t"
-		 */
 		@Override
 		protected void setup(Context context) throws IOException, InterruptedException {
 			Path middle_result_path = new Path("mid/part-r-00000");
