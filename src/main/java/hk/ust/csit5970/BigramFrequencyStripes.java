@@ -101,9 +101,14 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 				totalCount += SUM_STRIPES.get(w2);
 			}
 			
-			// Emit relative frequencies
+			// First emit the total count for this word
 			if (totalCount > 0) {
 				String w1 = key.toString();
+				BIGRAM.set(w1, "");
+				FREQ.set(totalCount);
+				context.write(BIGRAM, FREQ);
+				
+				// Then emit relative frequencies
 				for (String w2 : SUM_STRIPES.keySet()) {
 					BIGRAM.set(w1, w2);
 					FREQ.set((float)SUM_STRIPES.get(w2) / totalCount);

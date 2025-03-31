@@ -86,7 +86,7 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 
 		// Reuse objects.
 		private final static FloatWritable VALUE = new FloatWritable();
-		private final Map<String, Integer> counts = new HashMap<>();
+		private final static PairOfStrings TOTAL = new PairOfStrings();
 		private String currentWord = null;
 		private int marginalCount = 0;
 
@@ -104,14 +104,26 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 
 			// If this is a marginal count (w2 is empty)
 			if (w2.length() == 0) {
+				// If we've moved to a new word, output its total count
+				if (!w1.equals(currentWord)) {
+					if (currentWord != null) {
+						TOTAL.set(currentWord, "");
+						VALUE.set(marginalCount);
+						context.write(TOTAL, VALUE);
+					}
+					currentWord = w1;
+				}
 				marginalCount = sum;
-				currentWord = w1;
 				return;
 			}
 
-			// If we've moved to a new w1, output all stored probabilities
+			// If we've moved to a new w1, output previous word's total count
 			if (!w1.equals(currentWord)) {
-				// Reset for new word
+				if (currentWord != null) {
+					TOTAL.set(currentWord, "");
+					VALUE.set(marginalCount);
+					context.write(TOTAL, VALUE);
+				}
 				currentWord = w1;
 				marginalCount = 0;
 				return;
@@ -121,6 +133,16 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			if (marginalCount > 0) {
 				VALUE.set((float)sum / marginalCount);
 				context.write(key, VALUE);
+			}
+		}
+		
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			// Output the last word's total count
+			if (currentWord != null) {
+				TOTAL.set(currentWord, "");
+				VALUE.set(marginalCount);
+				context.write(TOTAL, VALUE);
 			}
 		}
 	}
